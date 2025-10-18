@@ -32,7 +32,10 @@
       "Bash(ipconfig:*)",
       "Bash(EDITOR=echo git rebase:*)",
       "Bash(git rebase:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(node:*)",
+      "Bash(pg_isready:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []

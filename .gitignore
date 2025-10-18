@@ -47,3 +47,17 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Application specific
+data/
+logs/
+sessions/
+qr.png
+*.sqlite
+*.sqlite3
+
+# Test files
+test-*.js
+
+# Claude AI
+.claude/settings.local.json
