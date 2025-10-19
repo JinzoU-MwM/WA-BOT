@@ -35,7 +35,11 @@
       "Bash(git checkout:*)",
       "Bash(node:*)",
       "Bash(pg_isready:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git pull:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

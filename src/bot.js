@@ -8,6 +8,7 @@ const DocumentService = require('./documentService');
 const DocumentMenuService = require('./documentMenuService');
 const StatusService = require('./statusService');
 const StatusAIService = require('./statusAIService');
+const AIChatService = require('./aiChatService');
 
 class WABot {
     constructor(config) {
@@ -33,6 +34,14 @@ class WABot {
         // Initialize status services
         this.statusService = new StatusService(this.databaseService);
         this.statusAIService = new StatusAIService(config.groqApiKey);
+
+        // Initialize AI Chat Service (replaces traditional menu system)
+        this.aiChatService = new AIChatService(
+            config.groqApiKey,
+            this.databaseService,
+            this.documentService,
+            this.statusService
+        );
     }
 
     async initialize() {
@@ -137,7 +146,9 @@ class WABot {
 
     isBotCommand(messageContent) {
         const content = messageContent.toLowerCase().trim();
-        return content.startsWith(this.commandKey.toLowerCase()) ||
+
+        // Traditional commands
+        const traditionalCommands = content.startsWith(this.commandKey.toLowerCase()) ||
                content === '.data' ||
                content === '.1' ||
                content === '.2' ||
@@ -153,12 +164,40 @@ class WABot {
                content === '.tambahstatus' ||
                content.startsWith('.tambahstatus ') ||
                content === '.help';
+
+        if (traditionalCommands) {
+            return true;
+        }
+
+        // Natural language AI chat triggers - Indonesian
+        const indonesianTriggers = [
+            'cari', 'search', 'lihat', 'show', 'tampilkan', 'display',
+            'cek', 'check', 'ada', 'berapa', 'how many', 'berapa banyak', 'apa', 'what',
+            'statistik', 'statistics', 'data', 'pengguna', 'user',
+            'kekurangan', 'document', 'dokumen', 'pt', 'perusahaan', 'company',
+            'laporan', 'report', 'status', 'kerja', 'work',
+            'tambah', 'tambahkan', 'update', 'insert', 'add',
+            'berikut', 'ikut', 'ini', 'dibawah ini', 'missing', 'hilang',
+            'tag', 'tags', 'pesan', 'message', 'semua', 'all',
+            'buat', 'create', 'generate', 'bantuan', 'help'
+        ];
+
+        // Natural language AI chat triggers - English
+        const englishTriggers = [
+            'find', 'get', 'list', 'show me', 'tell me', 'what',
+            'search for', 'look up', 'how many', 'statistics',
+            'users', 'messages', 'reports', 'status', 'add', 'create'
+        ];
+
+        // Check if message contains any trigger words
+        return indonesianTriggers.some(trigger => content.includes(trigger)) ||
+               englishTriggers.some(trigger => content.includes(trigger));
     }
 
     extractUserMessage(messageContent) {
         const content = messageContent.toLowerCase().trim();
 
-        // Handle direct commands
+        // Handle traditional commands
         if (content === '.data' || content === '.1' || content === '.2' ||
             content === '.3' || content === '.4' || content === '.5' ||
             content === '.help' || content === '.kekuranganpt' ||
@@ -169,9 +208,15 @@ class WABot {
             return content;
         }
 
-        return messageContent.trim()
-            .substring(this.commandKey.length)
-            .trim();
+        // Handle AI command with prefix (e.g., "!ai halo")
+        if (content.startsWith(this.commandKey.toLowerCase())) {
+            return messageContent.trim()
+                .substring(this.commandKey.length)
+                .trim();
+        }
+
+        // For natural language, return the original message
+        return messageContent.trim();
     }
 
     isDataCommand(userMessage) {
@@ -315,7 +360,7 @@ class WABot {
                 }
 
                 if (!userMessage) {
-                    const welcomeMessage = 'Halo! 👋 Saya adalah asisten AI. Silakan ketik pesan Anda setelah tombol perintah untuk mengobrol dengan saya.\n\n💡 Gunakan `.data` untuk mengakses menu database!\n💡 Gunakan `.help` untuk melihat semua perintah yang tersedia!';
+                    const welcomeMessage = '🤖 *Halo! Saya adalah Asisten AI WhatsApp Bot*\n\nSaya siap membantu Anda dengan:\n• 📊 Data pengguna dan statistik\n• 📋 Manajemen dokumen dan kekurangan PT\n• 📈 Laporan status pekerjaan\n• 💬 Chat AI dengan memori percakapan\n\n💡 *Cara penggunaan:*\n• Ketik permintaan dalam bahasa Indonesia atau Inggris\n• Contoh: "cari data user john", "lihat statistik pesan", "cek kekurangan PT Maju Bersatu"\n• Tidak perlu lagi menggunakan menu! Chat langsung dengan saya\n\n🎯 *Apa yang bisa saya bantu hari ini?*';
 
                     if (this.simulationMode) {
                         console.log(`🔧 [SIMULATION] Welcome message to ${parsedMessage.senderName}: ${welcomeMessage}`);
@@ -332,27 +377,34 @@ class WABot {
                 // Show typing indicator
                 await this.sendTypingIndicator(parsedMessage.chatId);
 
-                // Get AI response
-                const response = await this.groqService.chatWithContext(history, userMessage);
+                // Process with AI Chat Service (with MCP tools)
+                const response = await this.aiChatService.processMessage(userMessage, history);
 
                 if (response.success) {
+                    let responseText = response.content;
+
+                    // Add tool usage indicator if tools were used
+                    if (response.usedTools) {
+                        responseText += '\n\n🔧 *Processed with AI tools*';
+                    }
+
                     // Send response (or simulate)
                     if (this.simulationMode) {
-                        console.log(`🔧 [SIMULATION] Response to ${parsedMessage.senderName}: ${response.content}`);
+                        console.log(`🔧 [SIMULATION] Response to ${parsedMessage.senderName}: ${responseText}`);
                     } else {
-                        await this.wahaService.sendMessage(parsedMessage.chatId, response.content);
+                        await this.wahaService.sendMessage(parsedMessage.chatId, responseText);
                     }
 
                     // Update conversation history
                     this.addToHistory(conversationKey, 'user', userMessage);
-                    this.addToHistory(conversationKey, 'assistant', response.content);
+                    this.addToHistory(conversationKey, 'assistant', responseText);
 
                     // Log message and response to database
-                    await this.logMessageToDatabase(parsedMessage, response.content);
+                    await this.logMessageToDatabase(parsedMessage, responseText);
 
-                    console.log(`AI response processed for ${parsedMessage.senderName}`);
+                    console.log(`AI chat response processed for ${parsedMessage.senderName} (tools used: ${response.usedTools})`);
                 } else {
-                    const errorMessage = 'Maaf, saya mengalami kesalahan saat memproses permintaan Anda. Silakan coba lagi nanti.';
+                    const errorMessage = `Maaf, saya mengalami kesalahan saat memproses permintaan Anda. Silakan coba lagi.\n\n💡 *Tips:*\n• Pastikan permintaan Anda jelas\n• Coba dengan kata kunci seperti: "cari", "lihat", "cek", "tambah"\n• Contoh: "cari data user", "lihat statistik", "cek kekurangan PT Nama"`;
 
                     if (this.simulationMode) {
                         console.log(`🔧 [SIMULATION] Error message to ${parsedMessage.senderName}: ${errorMessage}`);
@@ -363,7 +415,7 @@ class WABot {
                     // Log failed message to database
                     await this.logMessageToDatabase(parsedMessage, errorMessage);
 
-                    console.error('Groq API error:', response.error);
+                    console.error('AI Chat Service error:', response.error);
                 }
 
                 // Mark message as read (optional, ignore errors)
@@ -1344,59 +1396,63 @@ ${formattedKekurangan}
 
     // Get help message with all available commands
     getHelpMessage() {
-        return `🤖 *WhatsApp Bot - Bantuan & Perintah*
+        return `🤖 *WhatsApp AI Bot - Panduan Lengkap*
 
-📋 *Perintah Database:*
-• \`.data\` - Tampilkan menu database
-• \`.1 [nama]\` - Cari data pengguna spesifik
-• \`.2\` - Lihat semua pengguna dalam database
-• \`.3\` - Lihat statistik pesan
-• \`.4 [tag]\` - Jelajahi pengguna berdasarkan tags
-• \`.5\` - Keluar menu database
+🚀 *Cara Baru Berinteraksi:*
+Tidak perlu lagi menggunakan menu! Sekarang Anda bisa chat langsung dengan AI menggunakan bahasa alami.
 
-📋 *Perintah Kekurangan Dokumen (Langsung):*
-• \`.kekuranganpt [nama PT]\` - Cek kekurangan dokumen PT
-• \`.updatekekuranganpt [nama PT]:[kekurangan]\` - Tambah kekurangan dokumen
+💬 *Cara Penggunaan AI Chat:*
+Ketik permintaan Anda dalam bahasa Indonesia atau Inggris, contoh:
 
-📋 *Perintah Status Pekerjaan:*
-• \`.laporan\` - Lihat laporan status pekerjaan hari ini (format AI untuk pimpinan)
-• \`.laporan [tanggal]\` - Lihat laporan status per tanggal (format: DD/MM/YYYY)
-• \`.tambahstatus [teks status]\` - Tambah status pekerjaan baru
+📊 *Data & Statistik:*
+• "cari data user john" → Mencari pengguna bernama John
+• "lihat semua pengguna" → Menampilkan daftar semua pengguna
+• "tampilkan statistik pesan" → Menampilkan statistik lengkap
+• "berapa total pesan hari ini?" → Info statistik hari ini
+• "cari user dengan tag important" → Cari berdasarkan tag
 
-💬 *Perintah Chat AI:*
-• \`${this.commandKey} <pesan>\` - Mengobrol dengan asisten AI
+📋 *Dokumen & Kekurangan PT:*
+• "cek kekurangan PT Maju Bersatu" → Cek kekurangan dokumen
+• "tambah kekurangan PT Test: paspor, visa" → Tambah kekurangan
+• "ada kekurangan apa untuk PT Travel Umroh?" → Info kekurangan
 
-📊 *Contoh Penggunaan:*
-**Cek Kekurangan PT:**
-• \`.kekuranganpt PT Maju Bersatu\`
-• \`.kekuranganpt Travel Umroh Bersama\`
+📈 *Status Pekerjaan:*
+• "laporan status hari ini" → Laporan status terkini
+• "tambah status: PT Merdeka proses legalitas" → Tambah status baru
+• "status kemarin ada apa saja?" → Lihat status kemarin
+• "buat laporan AI untuk pimpinan" → Generate laporan formal
 
-**Tambah Kekurangan (Format dengan Jenis Pekerjaan):**
-• \`.updatekekuranganpt PT Maju Bersatu:PPIU:1. ktp
-2. sk ppiu\`
-• \`.updatekekuranganpt Travel Umroh:Umroh Plus:1. paspor
-2. visa
-3. tiket pesawat\`
+🎯 *Contoh Percakapan:*
+**User:** "cari data pengguna dengan nama andi"
+**AI:** 🔍 *Menemukan 2 pengguna dengan nama 'andi'...*
 
-**Status Pekerjaan:**
-• \`.laporan\` - Lihat laporan status hari ini (sudah diformat AI)
-• \`.laporan 15/10/2025\` - Lihat status per tanggal tertentu
-• \`.tambahstatus PT merdeka proses menunggu akta\` - Tambah status baru
-• \`.tambahstatus PT kawan menunggu legalitas\` - Tambah status baru
+**User:** "cek kekurangan PT Maju Bersatu"
+**AI:** 📋 *Kekurangan Dokumen untuk PT Maju Bersatu...*
 
-💡 *Tips:*
-• Gunakan \`.data\` untuk menu database pengguna
-• Perintah \`.kekuranganpt\` langsung tanpa melalui menu
-• Perintah \`.updatekekuranganpt\` untuk tambah kekurangan
-• Perintah \`.laporan\` untuk laporan harian ke pimpinan (AI format)
-• Perintah \`.tambahstatus\` untuk tambah status pekerjaan
-• Chat AI mengingat riwayat percakapan
-• Semua perintah bekerja di chat pribadi dan grup
+**User:** "tambah status PT Test menunggu dokumen"
+**AI:** ✅ *Status berhasil ditambahkan...*
 
-🔧 *Butuh Bantuan Lainnya?*
-• Kirim \`.help\` kapan saja untuk melihat pesan ini
-• Kirim \`.kekuranganpt\` tanpa parameter untuk lihat format
-• Hubungi dukungan jika mengalami masalah`;
+🔧 *Fitur AI Chat:*
+✅ Memahami bahasa Indonesia & Inggris
+✅ Memori percakapan (mengingat konteks)
+✅ Akses database langsung tanpa menu
+✅ Pemrosesan cerdas dengan AI tools
+✅ Format respons yang mudah dibaca
+
+💡 *Tips Penggunaan:*
+• Gunakan kata kunci: "cari", "lihat", "cek", "tambah", "laporan"
+• Bisa bahasa Indonesia atau Inggris
+• Tidak perlu format perintah yang rumit
+• AI akan mengerti maksud Anda
+
+⚡ *Perintah Tradisional (Masih Bisa):*
+• \`.data\` - Menu database (jika diperlukan)
+• \`.help\` - Bantuan ini
+• \`${this.commandKey} <pesan>\` - Chat AI alternatif
+
+🎉 *Sekarang lebih mudah! Cukup chat dengan AI seperti berbicara dengan asisten nyata!*
+
+📱 *Butuh bantuan?* Kirim pesan dengan kata "help" atau "bantuan"`;
     }
 
     // Handle status commands (.laporan, .tambahstatus)

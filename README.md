@@ -8,19 +8,43 @@ A WhatsApp bot that integrates with WAHA API and Groq AI to provide intelligent 
 
 ## Features
 
-- 🤖 AI-powered chat responses using Groq API
+- 🤖 **Natural Language AI Chat** - Chat directly with AI in Indonesian or English
+- 🔧 **MCP (Model Context Protocol) Integration** - Advanced AI tool usage
 - 💬 Works in both private and group chats
-- 🔘 Command-based activation (configurable)
-- 📝 Conversation context awareness
-- 🔄 Automatic message polling
+- 📝 Conversation context awareness with memory
+- 🔄 Automatic message processing
 - 🛡️ Error handling and recovery
 - 📊 Health check endpoints
-- 🗄️ **NEW**: PostgreSQL database integration
-- 📈 **NEW**: User data tracking and analytics
-- 🔍 **NEW**: Advanced search capabilities
-- 📋 **NEW**: Interactive database menu system
-- 🏷️ **NEW**: Tag-based message organization
-- 📊 **NEW**: Message statistics and insights
+- 🗄️ PostgreSQL database integration with SQLite fallback
+- 📈 User data tracking and analytics
+- 🔍 Advanced search capabilities
+- 📋 Document management and shortage tracking
+- 🏷️ Tag-based message organization
+- 📊 Message statistics and insights
+- 📈 Work status management and reporting
+
+## 🚀 NEW: Natural Language AI Chat
+
+**No more complex menus!** Now you can chat naturally with the AI bot:
+
+### Example Conversations:
+- **User:** "cari data user john" → AI finds users named John
+- **User:** "cek kekurangan PT Maju Bersatu" → AI shows document shortages
+- **User:** "tambah status PT Test proses legalitas" → AI adds new status
+- **User:** "berapa total pesan hari ini?" → AI provides statistics
+- **User:** "lihat laporan status kemarin" → AI shows yesterday's reports
+
+### Supported Languages:
+- 🇮🇩 Indonesian (Bahasa Indonesia)
+- 🇬🇧 English
+
+### AI Capabilities:
+- ✅ Natural language understanding
+- ✅ Contextual conversations with memory
+- ✅ Database query automation
+- ✅ Document management
+- ✅ Status reporting
+- ✅ Statistical analysis
 
 ## Prerequisites
 
